@@ -11,6 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 from keras.layers import Dense, Dropout, LSTM # type: ignore
 from keras.models import Sequential # type: ignore
+from keras.callbacks import ModelCheckpoint, EarlyStopping # type: ignore
 from dateutil import parser
 from pickle import dump
 from pickle import load
@@ -99,13 +100,33 @@ lstm_model.add(Dense(units=future_day))
 lstm_model.summary()
 
 lstm_model.compile(optimizer='adam', loss='mean_squared_error')
-lstm_model.fit(x_train, y_train, epochs=10, batch_size=32, validation_split=0.1)                 #keep epochs at least 10
+# lstm_model.fit(x_train, y_train, epochs=10, batch_size=32, validation_split=0.25)                 #keep epochs at least 10
+checkpoint_path = 'lstm_model.keras'
+checkpoint = ModelCheckpoint(filepath=checkpoint_path,
+                             monitor='val_loss',
+                             verbose=1,
+                             save_best_only=True,
+                             mode='min')
+earlystopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+callbacks = [checkpoint, earlystopping]
+history = lstm_model.fit(x_train, y_train, epochs=10, batch_size=32, validation_split=0.25, callbacks=callbacks)
+
+# plotting the train_loss & val_loss graph for model
+# plt.figure(figsize=(16,7))
+# plt.plot(history.history['loss'], label='train_loss')
+# plt.plot(history.history['val_loss'], label='val_loss')
+# plt.legend()
+# plt.show()
+
+lstm_model = load_model(checkpoint_path)                             # to reuse the lstm_model from checkpoint
 #save the lstm_model                                        # too big model for pickle to save, so use keras.models
 #dump(lstm_model, open('lstm_model.pkl','wb'))
-lstm_model.save('lstm_model.keras')                                # to save keras model and load the model
-
+lstm_model.save('lstm_model.keras')                                 # to save keras model and load the model later
+                                                                    # It is anyway saved through callback earlier
+                                                                    # It is written here just to show demonstration of save method.
 # Evaluate the model on test data
-lstm_model.evaluate(x_test, y_test)
+test_loss = lstm_model.evaluate(x_test, y_test)
+print('Evaluation of lstm_model - test_loss:', test_loss)
 
 # Predict the model on test data and plot the output graph
 prediction_test = lstm_model.predict(x_test, batch_size=1)
